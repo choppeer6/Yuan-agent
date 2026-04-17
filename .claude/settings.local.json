@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p hello_agents/core hello_agents/agents hello_agents/tools/builtin)",
+      "Bash(touch hello_agents/core/agent.py hello_agents/core/llm.py hello_agents/core/message.py hello_agents/core/config.py hello_agents/core/exceptions.py hello_agents/agents/simple_agent.py hello_agents/agents/react_agent.py hello_agents/agents/reflection_agent.py hello_agents/agents/plan_solve_agent.py hello_agents/tools/base.py hello_agents/tools/registry.py hello_agents/tools/chain.py hello_agents/tools/async_executor.py hello_agents/tools/builtin/calculator.py hello_agents/tools/builtin/search.py)"
+    ]
+  }
+}
