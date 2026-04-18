@@ -1,4 +1,5 @@
 from ..base import BaseTool
+from ...core.exceptions import ToolError
 
 class CalculatorTool(BaseTool):
     """
@@ -12,8 +13,9 @@ class CalculatorTool(BaseTool):
 
     def run(self, expression: str) -> str:
         try:
-            # 这是一个简单的 eval，实际应用中建议使用更安全的数学表达式解析器
+            # 实际应用中建议使用更安全的数学表达式解析器
             result = eval(expression)
             return str(result)
         except Exception as e:
-            return f"Error: {e}"
+            # 统一抛出 ToolError
+            raise ToolError(self.name, str(e))

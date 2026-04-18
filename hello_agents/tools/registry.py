@@ -1,5 +1,6 @@
 from typing import Dict, List
 from .base import BaseTool
+from ..core.exceptions import ToolNotFoundError
 
 class ToolRegistry:
     """
@@ -13,12 +14,11 @@ class ToolRegistry:
         print(f"🛠️ 工具已注册: {tool.name}")
 
     def get_tool(self, name: str) -> BaseTool:
-        return self._tools.get(name)
+        if name not in self._tools:
+            raise ToolNotFoundError(name)
+        return self._tools[name]
 
     def list_tools_for_prompt(self) -> str:
-        """
-        生成给 LLM 看的工具说明列表。
-        """
         return "\n".join([tool.to_prompt() for tool in self._tools.values()])
 
     def get_all_tools(self) -> List[BaseTool]:

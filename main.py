@@ -1,9 +1,9 @@
 from hello_agents.core.llm import HelloAgentsLLM
 from hello_agents.tools.registry import ToolRegistry
 from hello_agents.tools.builtin.calculator import CalculatorTool
+from hello_agents.tools.builtin.search import SearchTool
 from hello_agents.agents.react_agent import ReActAgent
 from hello_agents.agents.plan_solve_agent import PlanSolveAgent
-from hello_agents.agents.reflection_agent import ReflectionAgent
 
 def main():
     # 1. 初始化 LLM
@@ -12,20 +12,20 @@ def main():
     # 2. 准备工具
     registry = ToolRegistry()
     registry.register(CalculatorTool())
+    registry.register(SearchTool())
 
-    # --- 演示 ReAct ---
-    # task_math = "我有 5000 元，买了 3 台单价为 1299 元的打印机，剩下的钱刚好够买几盒单价为 45 元的墨盒？"
-    # react_agent = ReActAgent(llm=llm, tools=registry)
-    # react_agent.run(task_math)
+    # 3. 准备任务：需要联网获取实时信息并计算
+    task = "当前 1 美元兑换人民币的汇率是多少？如果我有 500 美元，我能换到多少人民币？"
 
-    # --- 演示 Reflection ---
-    print("\n" + "="*20 + " 演示 Reflection Agent " + "="*20)
-    task_code = "用 Python 实现一个函数计算斐波那契数列第 n 项的值。"
-    reflection_agent = ReflectionAgent(llm=llm)
-    # 运行 1 轮反思（生成 -> 反思 -> 修正）
-    reflection_result = reflection_agent.run(task_code, iterations=1)
+    print("="*20 + " 演示 ReAct Agent (带搜索) " + "="*20)
+    # 我们可以通过设置 settings.DEBUG = True 来查看详细的工具调用过程
+    from hello_agents.core.config import settings
+    settings.DEBUG = True 
     
-    print(f"\n✅ Reflection 最终输出:\n{reflection_result}")
+    agent = ReActAgent(llm=llm, tools=registry)
+    result = agent.run(task)
+    
+    print(f"\n✅ 最终答案: {result}")
 
 if __name__ == "__main__":
     main()
