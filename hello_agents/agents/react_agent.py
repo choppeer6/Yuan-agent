@@ -7,7 +7,7 @@ from ..core.exceptions import LLMError
 
 class ReActAgent(BaseAgent):
     """
-    实现经典的 ReAct (Reason + Act) 模式。
+    支持异步 (Async) 和并发 (Parallel Action) 的 ReAct 模式。
     """
 
     REACT_SYSTEM_PROMPT = """You are a helpful assistant with access to several tools.
@@ -15,7 +15,8 @@ For each user request, follow this format:
 
 Thought: Describe your reasoning about what to do next.
 Action: tool_name("arguments")
-Observation: The result of the tool execution.
+... (You can provide multiple Actions if needed to run them in parallel)
+Observation: The result(s) of the tool execution(s).
 ... (Repeat Thought/Action/Observation if needed)
 Final Answer: The final response to the user.
 
@@ -29,14 +30,13 @@ Available tools:
         super().__init__(llm, system_prompt=system_prompt, tools=tools)
 
     @override
-    def run(self, user_input: str, max_steps: int = None) -> str:
+    async def run(self, user_input: str, max_steps: int = None) -> str:
         """
-        ReAct 的核心循环。
-        使用 settings.AGENT_MAX_STEPS 作为默认值。
+        异步并发版的 ReAct 核心循环。
         """
         steps = max_steps or settings.AGENT_MAX_STEPS
         
-        print(f"\n🚀 [ReAct] 开始处理任务: {user_input}")
+        print(f"\n🚀 [Async ReAct] 开始并发任务: {user_input}")
         self.add_message(user_message(user_input))
 
         for step in range(steps):
@@ -51,16 +51,19 @@ Available tools:
                 if "Final Answer:" in response_text:
                     return response_text.split("Final Answer:")[-1].strip()
 
-                # 3. 执行
-                observation_text = self.parse_and_execute_action(response_text)
+                # 3. 并发执行 Action(s)
+                # 这就是 AsyncExecutor 发挥作用的地方
+                observation_text = await self.executor.execute_all(response_text)
+                
                 if observation_text:
+                    if settings.DEBUG:
+                        print(f"👁️ [Debug] 并发执行结果:\n{observation_text}")
                     self.add_message(user_message(observation_text))
                 else:
                     msg = "No Action or Final Answer found. Please follow the format."
                     self.add_message(user_message(msg))
             
             except LLMError as e:
-                # 处理模型调用异常（如超时或 API 问题）
                 print(f"❌ 模型调用出错: {e}")
                 return f"Sorry, I encountered an error: {str(e)}"
 
