@@ -44,7 +44,7 @@ Available tools:
             
             try:
                 # 1. 思考
-                response_text = self.llm.think(self.memory)
+                response_text = await self.llm.athink(self.memory)
                 self.add_message(assistant_message(response_text))
 
                 # 2. 检查答案

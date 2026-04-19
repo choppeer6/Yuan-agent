@@ -1,12 +1,13 @@
-from openai import OpenAI
-from typing import List, Dict, Optional
+from openai import AsyncOpenAI
+from typing import List, Dict, Optional, Any
 from .config import settings
 from .exceptions import LLMError
+from .message import Message
 
 class HelloAgentsLLM:
     """
     为本书 "Hello Agents" 定制的LLM客户端。
-    它用于调用任何兼容OpenAI接口的服务。
+    支持同步和异步调用，兼容 OpenAI 接口。
     """
 
     def __init__(self, model: str = None, api_key: str = None, base_url: str = None, timeout: int = None):
@@ -21,57 +22,73 @@ class HelloAgentsLLM:
         if not all([self.model, api_key, base_url]):
             raise LLMError("模型ID、API密钥和服务地址必须被提供或在配置中定义。")
 
-        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+        # 同时初始化同步和异步客户端
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
 
-    def think(self, messages: List[Dict[str, str]], temperature: float = None) -> str:
+    async def astream_chat(self, messages: List[Message], temperature: float = None) -> str:
         """
-        调用大语言模型进行思考，并返回其响应。
+        异步流式调用大语言模型。
         """
         temp = temperature if temperature is not None else settings.AGENT_DEFAULT_TEMPERATURE
+        
+        # 将 Message 对象转换为 OpenAI 要求的字典格式
+        formatted_messages = [{"role": m.role, "content": m.content} for m in messages]
 
         if settings.DEBUG:
-            print(f"🧠 [Debug] 正在调用 {self.model} 模型 (Temp: {temp})...")
+            print(f"🧠 [Async Debug] 正在调用 {self.model} 模型 (Temp: {temp})...")
 
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=formatted_messages,
                 temperature=temp,
                 stream=True,
             )
 
             collected_content = []
-            for chunk in response:
+            async for chunk in response:
                 content = chunk.choices[0].delta.content or ""
                 if settings.DEBUG:
                     print(content, end="", flush=True)
                 collected_content.append(content)
 
             if settings.DEBUG:
-                print()  # 在流式输出结束后换行
+                print()  # 换行
 
             return "".join(collected_content)
 
         except Exception as e:
-            raise LLMError(f"调用LLM API时发生错误: {e}")
+            raise LLMError(f"异步调用LLM API时发生错误: {e}")
 
+    async def athink(self, messages: List[Dict[str, str]], temperature: float = None) -> str:
+        """
+        athink 是 astream_chat 的别名或简化版，接收字典格式的输入。
+        """
+        temp = temperature if temperature is not None else settings.AGENT_DEFAULT_TEMPERATURE
+        
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temp,
+                stream=False,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            raise LLMError(f"异步调用LLM (athink) 时发生错误: {e}")
 
-
-# --- 客户端使用示例 ---
-if __name__ == '__main__':
-    try:
-        llmClient = HelloAgentsLLM()
-
-        exampleMessages = [
-            {"role": "system", "content": "You are a helpful assistant that writes Python code."},
-            {"role": "user", "content": "写一个快速排序算法"}
-        ]
-
-        print("--- 调用LLM ---")
-        responseText = llmClient.think(exampleMessages)
-        if responseText:
-            print("\n\n--- 完整模型响应 ---")
-            print(responseText)
-
-    except ValueError as e:
-        print(e)
+    def think(self, messages: List[Dict[str, str]], temperature: float = None) -> str:
+        """
+        保留同步调用方法（虽然内部现在建议使用异步）。
+        为了简单起见，这里可以抛出一个提示或保持原有逻辑（但需要同步客户端）。
+        由于我们主要走异步流程，这里建议尽量使用 athink 或 astream_chat。
+        """
+        import asyncio
+        # 这是一个 hack 手段，在同步环境中调用异步方法
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(self.athink(messages, temperature))

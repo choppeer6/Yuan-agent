@@ -17,37 +17,37 @@ class ReflectionAgent(BaseAgent):
         super().__init__(llm, system_prompt="You are an expert who strives for perfection through self-reflection.", tools=tools)
 
     @override
-    def run(self, user_input: str, iterations: int = 1) -> str:
+    async def run(self, user_input: str, iterations: int = 1) -> str:
         """
-        Reflection 的运行逻辑。
-        iterations: 反思的轮数。
+        异步运行反思循环。
         """
-        print(f"\n🚀 [Reflection] 开始处理任务: {user_input}")
-        
-        # 1. 初始生成
-        print("\n🎨 正在生成初始草案...")
+        # 1. 初始化生成
+        print(f"\n🚀 [Reflection] 初始生成任务: {user_input}")
         self.add_message(user_message(self.GENERATE_PROMPT.format(task=user_input)))
-        draft = self.llm.think(self.memory)
-        self.add_message(assistant_message(draft))
-
-        current_content = draft
-
+        
+        # 调用 LLM 生成第一个版本
+        response = await self.llm.astream_chat(self.memory)
+        self.add_message(assistant_message(response))
+        
+        # 2. 循环反思
         for i in range(iterations):
-            print(f"\n--- 反思轮次 {i + 1} ---")
-
-            # 2. 自我反思
-            print("🔍 正在进行自我批评...")
-            self.add_message(user_message(self.REFLECT_PROMPT))
-            critique = self.llm.think(self.memory)
-            self.add_message(assistant_message(critique))
-
-            # 3. 根据反思进行修正
-            print("🛠️ 正在根据反馈进行优化...")
-            self.add_message(user_message(self.REFINE_PROMPT))
-            refined_content = self.llm.think(self.memory)
-            self.add_message(assistant_message(refined_content))
+            print(f"🔄 [Reflection] 正在进行第 {i+1} 轮反思...")
             
-            current_content = refined_content
-
-        print("\n✅ 反思循环完成。")
-        return current_content
+            # 添加反思指令
+            self.add_message(user_message(self.REFLECT_PROMPT))
+            
+            # LLM 反思
+            critique = await self.llm.astream_chat(self.memory)
+            self.add_message(assistant_message(critique))
+            
+            print(f"📝 [Reflection] 反思意见已生成，正在修正...")
+            
+            # 添加修正指令
+            self.add_message(user_message(self.REFINE_PROMPT))
+            
+            # LLM 修正
+            response = await self.llm.astream_chat(self.memory)
+            self.add_message(assistant_message(response))
+            
+        print("✅ [Reflection] 任务已通过反思优化")
+        return response
